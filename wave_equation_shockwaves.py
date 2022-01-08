@@ -19,8 +19,8 @@ def splash(u_current,u_last,loc,h=1):
     return u_current,u_last
 
 
-r = 1   #r = c*dt/dx
-c = 10
+r = 1  #r = c*dt/dx
+c = 20
 L = 10
 dx = 0.2
 h0 = 4
@@ -74,8 +74,10 @@ for M in Ms:
         u_current[:NN-n_ind],u_last[:NN-n_ind]  = u_current[n_ind:],u_last[n_ind:] 
         u_current[NN-n_ind:] = 0
         u_last[NN-n_ind:] = 0
-    if ii%freq_frame==0:
-        u_current,u_last = splash(u_current,u_last,(int(NN*0.5),int(NN*0.5)),h=0.5)
+    #u_current,u_last = splash(u_current,u_last,(int(NN*0.5),int(NN*0.5)),h=0.5)
+    u_current[int(NN*0.5),int(NN*0.5)] = 1
+    #if ii%freq_frame==0:
+    #    u_current,u_last = splash(u_current,u_last,(int(NN*0.5),int(NN*0.5)),h=0.5)
 
     for i in range(1,NN-1):
         for j in range(1,NN-1):

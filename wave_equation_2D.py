@@ -53,7 +53,7 @@ if plotting:
     
 X, Y = np.meshgrid(x0, x0)
 d=0
-v = c*0.8
+v = c*1
 n_ind = v*dt/dx
 print(n_ind)
 if n_ind>=1:
@@ -65,12 +65,12 @@ else:
     freq_frame = int(1 / r) + (1 % r > 0)
     n_ind = 1
     
-
+omega = 1
 print(freq)
 while t<=T:     
-    
     #sinusoidal source
-    u_current[int(NN/4),int(NN/4)] = u_current[int(3*NN/4),int(3*NN/4)] = 0.2*math.sin(50*t)
+    u_current[int(NN/2),int(NN/2)] = 0.2*math.sin(omega*2*math.pi*t/T)
+    omega = omega+0.1
     
 
 
@@ -92,7 +92,6 @@ while t<=T:
     for i in range(1,NN-1):
         for j in range(1,NN-1):
             u_next[i,j] = (2*u_current[i,j] - u_last[i,j] + 0.5*r2 * (u_current[i+1,j] + u_current[i-1,j] + u_current[i,j-1] + u_current[i,j+1] - 4*u_current[i,j] ))
-
     
     u_dy = u_next - u_current
     #account for damping
@@ -108,8 +107,10 @@ while t<=T:
             u_next[i,j] = u_next1[i,j] + 0.5*sum(Ts)*dt**2
 
     #boundaries
-    u_next[0] = 0
-    u_next[NN-1] = 0
+    u_next[0,:] = u_next[1,:]
+    u_next[NN-1,:] = u_next[NN-2,:]
+    u_next[:,0] = u_next[:,1]
+    u_next[:,NN-1] = u_next[:,NN-2]
 
     #reassign variables
     u_last[:], u_current[:] = u_current, u_next 
