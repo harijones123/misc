@@ -2,6 +2,9 @@ import random
 import math as m
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation, PillowWriter
+from IPython import display
+import time
 
 G = 6.67408E-4
 
@@ -25,8 +28,8 @@ class Planet(Body):
             if planet == self:
                 continue
             r_tgt = calc_distance(self.pos,planet.pos)
-            if r_tgt <= self.rad+planet.rad:
-                self.system.collision(self,planet)
+            if (r_tgt <= self.rad+planet.rad) and (self.system.collision==True):
+                self.system.collision_event(self,planet)
             a = tuple(map(sum,zip(a,self.get_acc(planet,r_tgt))))
         self.a = a
 
@@ -46,46 +49,74 @@ class Star(Body):
         super().__init__(m,pos0,0)
 
 class System():
-    def __init__(self,star,posns,ms,v0s):
+    def __init__(self,star,posns,ms,v0s,do_plot=True,collision=True):
         self.star = star
+        self.do_plot = do_plot
         self.planets = [Planet(mass,pos0,self,v0=v) for mass,pos0,v in zip(ms,posns,v0s)]
-        #setup plotting
-        plt.ion()
-        self.fig, self.ax = plt.subplots()
+        self.collision = collision
+        self.do_plot = do_plot
+        self.init_plotting()
+        
+    def init_plotting(self):
+        #setup plotting and animation saving
+        if self.do_plot==True:
+            plt.ion()
+        self.fig = plt.figure()
+        self.L=20
+        self.ax = plt.axes(xlim=(-self.L,self.L), ylim=(-self.L,self.L))
+        self.ax.set_axis_off()
+        self.scat = self.ax.scatter([], [])
+        self.historyx = []
+        self.historyy = []
+
+
     def simulate(self,T,dt):
         t=0
         self.historyx = []
         self.historyy = []
         while t<=T:
             self.make_timestep(dt)
-            self.plotting()
+            self.plotting(t)
             t = t+dt
 
     def make_timestep(self,dt):
         for planet in self.planets:
             planet.make_timestep(dt)
-    
-    def plotting(self):
+        mass = [planet.m**0.5 for planet in self.planets]
+        xpos = [planet.pos[0] for planet in self.planets]
+        ypos = [planet.pos[1] for planet in self.planets]
+
+    def animate(self,i,dt):
+        print(f"frame:{i}")
+        for planet in self.planets:
+            planet.make_timestep(dt)
+        mass = [planet.m**0.5 for planet in self.planets]
+        xpos = [planet.pos[0] for planet in self.planets]
+        ypos = [planet.pos[1] for planet in self.planets]
+        self.scat.set_offsets(np.column_stack((xpos, ypos)))
+        self.scat.set_sizes(mass)
+        return self.scat
+        
+    def plotting(self,t):
         x = [planet.pos[0] for planet in self.planets]
         y = [planet.pos[1] for planet in self.planets]
         mass = [planet.m**0.5 for planet in self.planets]
-        #self.historyx.append(x)
-        #self.historyy.append(y)
-        #self.historyx = self.historyx[len(self.historyx)-10:]
-        #self.historyy = self.historyy[len(self.historyy)-10:]
-        #self.ax.plot(self.historyx,self.historyy,"b")
-        self.ax.plot(self.star.pos[0],self.star.pos[1],"k+")
-        self.ax.scatter(x,y,s=mass)
-        L=20
-        plt.xlim(-L,L)
-        plt.ylim(-L,L)
-        #self.sc.set_offsets(np.c_[x,y])
-        #self.fig.canvas.draw_idle()
-        plt.pause(0.01)
-        plt.draw()
-        plt.cla()
 
-    def collision(self,p1,p2):
+        if self.do_plot==True:
+            self.scat.set_offsets(np.c_[x,y])
+            self.scat.set_sizes(mass)
+            self.fig.canvas.draw_idle()
+            #self.ax.plot(self.star.pos[0],self.star.pos[1],"k+")
+            #if t>=T/10:
+            #    self.historyx.append(x)
+            #    self.historyy.append(y)
+            #    self.ax.plot(self.historyx,self.historyy,"b")
+            plt.xlim(-self.L,self.L)
+            plt.ylim(-self.L,self.L)
+            plt.pause(0.01)
+            plt.draw()
+
+    def collision_event(self,p1,p2):
         if p2.m > p1.m:
             p1,p2 = p2,p1
         #velocity calculated based on cons of momentum
@@ -93,9 +124,21 @@ class System():
         p1.v = ((p1.v[0]*p1.m + p2.v[0]*p2.m)/sum_m, (p1.v[1]*p1.m + p2.v[1]*p2.m)/sum_m) 
         p1.m = sum_m 
         #drop planet 2 as it's been engulfed by planet 1
-        self.planets.remove(p2)
+        if p2 in self.planets:
+            self.planets.remove(p2)
+    
+    def create_animation(self,dt,frames):
+        self.anim = FuncAnimation(self.fig, self.animate,fargs=(dt,),frames=frames)
 
         
+def generate_tangential_vector(input_vector,scale=1):
+    """generates unit vector in direction of circular motion in x,y coords"""
+    a,b = input_vector
+    K = -b/a 
+    if a>=0:
+        scale = -scale
+    return (scale*K/(K**2 + 1)**0.5,scale*1/(K**2 + 1)**0.5)
+
 
 
 star1 = Star(m=5000,pos0=(0,0))
@@ -104,22 +147,28 @@ posns = [(0,5),(0,-6)]
 ms = [100,10]
 v0s = [(0.3,0),(-0.3,0)]
 """
+
+#starting conditions
+NN = 10
+dt = 0.05
+frames = 20000
+T = frames*dt
 posns = []
 ms = []
 v0s = []
-posrange = np.linspace(-10,10,10)
-for i in np.linspace(-10,10,10):
-    for j in np.linspace(-10,10,10):
+masses = 20
+for i in np.linspace(-10,10,NN):
+    for j in np.linspace(-10,10,NN):
         posns.append((i,j))
-        ms.append(10)
+        ms.append(masses)
         #v0s.append((random.uniform(-0.1,0.1),random.uniform(-0.1,0.1)))
-        V = 1
-        vy = m.copysign(j/i, V*((j/i)**2 + 1)**-0.5)
-        vx = vy*j/i
-        print(f"{vx},{vy}")
-        v0s.append((vx,vy))
-    
+        r = m.sqrt(i**2 + j**2)
+        v = m.sqrt(G*(star1.m + ((r**2)/100)*masses*NN**2)/r)
+        v0s.append(generate_tangential_vector((i,j),scale=v))
 
+#simulate
+system1 = System(star1,posns,ms,v0s,do_plot=True)
 
-system1 = System(star1,posns,ms,v0s)
-system1.simulate(100,0.05)
+system1.simulate(T,dt)
+#system1.create_animation(dt,frames)
+#system1.anim.save('gravity.gif', writer=PillowWriter(fps=30) )
